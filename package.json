@@ -1,0 +1,84 @@
+{
+  "name": "cursor-git-log-explorer",
+  "displayName": "Git Log Explorer",
+  "description": "一个功能强大的Git日志管理插件，支持分支切换、提交筛选、文件差异查看和交互式变基操作",
+  "version": "1.0.0",
+  "publisher": "cursor-dev",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ArthurZangCN/vscode-git-log-explorer.git"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "git-log-explorer",
+          "title": "Git Log Explorer",
+          "icon": "$(git-branch)"
+        }
+      ]
+    },
+    "views": {
+      "git-log-explorer": [
+        {
+          "type": "webview",
+          "id": "gitLogExplorer.webview",
+          "name": "Git Log Explorer",
+          "when": "true"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gitLogExplorer.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitLogExplorer.showFilterMenu",
+        "title": "Show Filter Menu"
+      },
+      {
+        "command": "gitLogExplorer.exitCompareMode",
+        "title": "Exit Compare Mode"
+      },
+      {
+        "command": "gitLogExplorer.showCommitDiff",
+        "title": "Show Commit Diff"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitLogExplorer.refresh",
+          "when": "view == gitLogExplorer.webview",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "simple-git": "^3.19.1"
+  }
+} 
