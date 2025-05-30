@@ -234,16 +234,68 @@ export class GitService {
         try {
             console.log(`GitService: 获取分支/标签 ${branchOrTag} 的提交记录，最大数量: ${maxCount}`);
             
-            // 确定要查询的引用 - 优先使用远程版本
+            // 确定要查询的引用 - 比较远程和本地版本，使用最新的
             let refToQuery = branchOrTag;
+            let useRemote = false;
             
-            // 优先尝试远程分支，确保使用服务器最新版本
             try {
-                await this.git.revparse([`origin/${branchOrTag}`]);
-                refToQuery = `origin/${branchOrTag}`;
-                console.log(`GitService: 使用远程分支: origin/${branchOrTag}`);
+                // 检查远程分支是否存在
+                const remoteRef = `origin/${branchOrTag}`;
+                await this.git.revparse([remoteRef]);
+                
+                try {
+                    // 检查本地分支是否存在
+                    await this.git.revparse([branchOrTag]);
+                    
+                    // 如果本地和远程都存在，比较哪个更新
+                    const localCommit = await this.git.revparse([branchOrTag]);
+                    const remoteCommit = await this.git.revparse([remoteRef]);
+                    
+                    if (localCommit !== remoteCommit) {
+                        // 检查哪个分支更新（包含更多提交）
+                        try {
+                            const mergeBase = await this.git.raw(['merge-base', branchOrTag, remoteRef]);
+                            const localAhead = await this.git.raw(['rev-list', '--count', `${mergeBase.trim()}..${branchOrTag}`]);
+                            const remoteAhead = await this.git.raw(['rev-list', '--count', `${mergeBase.trim()}..${remoteRef}`]);
+                            
+                            const localAheadCount = parseInt(localAhead.trim()) || 0;
+                            const remoteAheadCount = parseInt(remoteAhead.trim()) || 0;
+                            
+                            if (remoteAheadCount > 0) {
+                                // 远程有新提交，使用远程版本
+                                refToQuery = remoteRef;
+                                useRemote = true;
+                                console.log(`GitService: 远程分支有 ${remoteAheadCount} 个新提交，使用远程版本: ${remoteRef}`);
+                            } else if (localAheadCount > 0) {
+                                // 本地有新提交，使用本地版本
+                                refToQuery = branchOrTag;
+                                console.log(`GitService: 本地分支有 ${localAheadCount} 个新提交，使用本地版本: ${branchOrTag}`);
+                            } else {
+                                // 相同，优先使用远程版本
+                                refToQuery = remoteRef;
+                                useRemote = true;
+                                console.log(`GitService: 本地和远程版本相同，使用远程版本: ${remoteRef}`);
+                            }
+                        } catch (compareError) {
+                            // 比较失败，优先使用远程版本
+                            refToQuery = remoteRef;
+                            useRemote = true;
+                            console.log(`GitService: 无法比较版本，使用远程版本: ${remoteRef}`);
+                        }
+                    } else {
+                        // 本地和远程指向同一个提交，优先使用远程版本
+                        refToQuery = remoteRef;
+                        useRemote = true;
+                        console.log(`GitService: 本地和远程指向同一提交，使用远程版本: ${remoteRef}`);
+                    }
+                } catch (localError) {
+                    // 本地分支不存在，使用远程分支
+                    refToQuery = remoteRef;
+                    useRemote = true;
+                    console.log(`GitService: 本地分支不存在，使用远程分支: ${remoteRef}`);
+                }
             } catch (remoteError) {
-                // 如果远程分支不存在，尝试本地分支/标签
+                // 远程分支不存在，尝试本地分支/标签
                 try {
                     await this.git.revparse([branchOrTag]);
                     refToQuery = branchOrTag;
@@ -251,11 +303,11 @@ export class GitService {
                 } catch (localError) {
                     // 如果都不存在，使用原始名称（可能是标签）
                     refToQuery = branchOrTag;
-                    console.log(`GitService: 使用原始引用: ${branchOrTag}`);
+                    console.log(`GitService: 本地和远程都不存在，使用原始引用: ${branchOrTag}`);
                 }
             }
 
-            console.log(`GitService: 查询引用: ${refToQuery}`);
+            console.log(`GitService: 最终查询引用: ${refToQuery} (使用${useRemote ? '远程' : '本地'}版本)`);
             
             // 使用正确的simple-git语法，直接传递分支名作为from参数
             const logResult = await this.git.log([refToQuery, '--max-count=' + maxCount]);

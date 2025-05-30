@@ -776,6 +776,7 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             align-items: center;
             margin-bottom: 8px;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         .header-row:last-child {
@@ -785,11 +786,13 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
         .header-label {
             font-size: 14px;
             min-width: 20px;
+            flex-shrink: 0;
         }
 
         .branch-selector {
             position: relative;
             flex: 1;
+            min-width: 120px;
             max-width: 200px;
         }
 
@@ -801,6 +804,7 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
             color: var(--vscode-input-foreground);
             font-size: 12px;
+            min-width: 0;
         }
 
         .branch-input:focus {
@@ -848,6 +852,9 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             padding: 4px 8px;
             cursor: pointer;
             font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .branch-option:hover {
@@ -861,6 +868,7 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
 
         .filter-input {
             flex: 1;
+            min-width: 80px;
             padding: 4px 8px;
             background: var(--vscode-input-background);
             border: 1px solid var(--vscode-input-border);
@@ -882,6 +890,8 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
             cursor: pointer;
             font-size: 12px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .btn:hover {
@@ -915,22 +925,83 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             background: var(--vscode-statusBar-background);
             border-bottom: 1px solid var(--vscode-panel-border);
             font-size: 11px;
+            flex-wrap: wrap;
+            gap: 8px;
         }
 
         .status-left, .status-right {
             display: flex;
             align-items: center;
             gap: 12px;
+            flex-wrap: wrap;
         }
 
         .status-item {
             display: flex;
             align-items: center;
             gap: 4px;
+            white-space: nowrap;
         }
 
         .status-icon {
             font-size: 10px;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 300px) {
+            .header-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 4px;
+            }
+            
+            .branch-selector {
+                max-width: none;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .status-left, .status-right {
+                justify-content: center;
+                gap: 8px;
+            }
+            
+            .btn-small {
+                padding: 4px 8px;
+            }
+        }
+
+        @media (max-width: 250px) {
+            .header {
+                padding: 8px;
+            }
+            
+            .status-bar {
+                padding: 6px 8px;
+            }
+            
+            .commits-container {
+                padding: 4px;
+            }
+            
+            .commit-item {
+                padding: 6px;
+            }
+            
+            .header-label {
+                display: none;
+            }
+            
+            .filter-input::placeholder {
+                font-size: 11px;
+            }
+            
+            .branch-input::placeholder {
+                font-size: 11px;
+            }
         }
 
         .commits-container {
@@ -965,6 +1036,8 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             align-items: center;
             margin-bottom: 4px;
             font-size: 11px;
+            flex-wrap: wrap;
+            gap: 4px;
         }
 
         .commit-hash {
@@ -974,23 +1047,30 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             padding: 2px 6px;
             border-radius: 3px;
             font-size: 10px;
-            margin-right: 8px;
+            flex-shrink: 0;
         }
 
         .commit-author {
             color: var(--vscode-gitDecoration-modifiedResourceForeground);
-            margin-right: 8px;
+            flex-shrink: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .commit-date {
             color: var(--vscode-descriptionForeground);
-            margin-left: auto;
+            flex-shrink: 0;
+            font-size: 10px;
         }
 
         .commit-message {
             font-size: 12px;
             font-weight: 500;
             line-height: 1.3;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .commit-details {
@@ -1006,6 +1086,40 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
 
         .commit-checkbox {
             margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        /* 在小屏幕上优化commit显示 */
+        @media (max-width: 300px) {
+            .commit-title {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 2px;
+            }
+            
+            .commit-author {
+                max-width: 100%;
+            }
+            
+            .commit-date {
+                align-self: flex-end;
+                font-size: 9px;
+            }
+        }
+
+        @media (max-width: 250px) {
+            .commit-hash {
+                font-size: 9px;
+                padding: 1px 4px;
+            }
+            
+            .commit-message {
+                font-size: 11px;
+            }
+            
+            .commit-author {
+                font-size: 10px;
+            }
         }
 
         .empty-state {

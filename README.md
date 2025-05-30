@@ -43,6 +43,32 @@
 2. 点击安装
 3. 重启VSCode
 
+### 从源码编译
+如果你想从源码编译插件：
+
+#### 方法一：使用编译脚本（推荐）
+```bash
+# Linux/macOS
+./build.sh
+
+# Windows
+build.bat
+```
+
+#### 方法二：手动编译
+```bash
+# 安装依赖
+npm install
+
+# 编译TypeScript
+npm run compile
+
+# 打包VSIX文件
+npm run build-vsix
+```
+
+编译完成后，会在项目根目录生成 `.vsix` 文件，可以通过VSCode的"从VSIX安装"功能进行安装。
+
 ### 使用
 1. **打开Git仓库**：在VSCode中打开任意Git项目
 2. **访问插件**：点击左侧活动栏的Git分支图标
