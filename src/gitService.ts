@@ -56,8 +56,30 @@ export class GitService {
             throw new Error('Git not initialized');
         }
 
-        const status = await this.git.status();
-        return status.current || 'HEAD';
+        try {
+            // 先尝试使用新版本的命令
+            const result = await this.git.raw(['symbolic-ref', '--short', 'HEAD']);
+            return result.trim();
+        } catch (error) {
+            // 如果失败，使用status方法作为回退
+            try {
+                const status = await this.git.status();
+                return status.current || 'HEAD';
+            } catch (statusError) {
+                // 最后的回退方案：解析git branch输出
+                try {
+                    const branchResult = await this.git.raw(['branch']);
+                    const lines = branchResult.split('\n');
+                    const currentLine = lines.find(line => line.startsWith('*'));
+                    if (currentLine) {
+                        return currentLine.replace('*', '').trim();
+                    }
+                } catch (branchError) {
+                    console.warn('所有获取当前分支的方法都失败了');
+                }
+                return 'HEAD';
+            }
+        }
     }
 
     public async getBranches(): Promise<GitBranch[]> {
@@ -586,6 +608,316 @@ export class GitService {
         } catch (error) {
             console.error('❌ 获取分支差异失败:', error);
             throw error;
+        }
+    }
+
+    // ==================== 新增功能 ====================
+
+    /**
+     * Stash 管理功能
+     */
+    public async getStashList(): Promise<Array<{index: number, message: string, branch: string, date: string}>> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            const result = await this.git.stashList();
+            return result.all.map((stash: any, index: number) => ({
+                index: index,
+                message: stash.message || `stash@{${index}}`,
+                branch: stash.branch || 'unknown',
+                date: stash.date || 'unknown'
+            }));
+        } catch (error) {
+            console.error('获取stash列表失败:', error);
+            throw error;
+        }
+    }
+
+    public async createStash(message?: string, includeUntracked: boolean = false): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            const options: string[] = [];
+            if (message) {
+                options.push('-m', message);
+            }
+            if (includeUntracked) {
+                options.push('-u');
+            }
+            
+            await this.git.stash(options);
+        } catch (error) {
+            console.error('创建stash失败:', error);
+            throw error;
+        }
+    }
+
+    public async applyStash(index: number, pop: boolean = false): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            if (pop) {
+                await this.git.stash(['pop', `stash@{${index}}`]);
+            } else {
+                await this.git.stash(['apply', `stash@{${index}}`]);
+            }
+        } catch (error) {
+            console.error(`${pop ? 'Pop' : 'Apply'} stash失败:`, error);
+            throw error;
+        }
+    }
+
+    public async dropStash(index: number): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            await this.git.stash(['drop', `stash@{${index}}`]);
+        } catch (error) {
+            console.error('删除stash失败:', error);
+            throw error;
+        }
+    }
+
+    public async showStash(index: number): Promise<string> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            return await this.git.stash(['show', '-p', `stash@{${index}}`]);
+        } catch (error) {
+            console.error('查看stash内容失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Rebase 功能
+     */
+    public async rebaseOnto(targetBranch: string, interactive: boolean = false): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            const options = [targetBranch];
+            if (interactive) {
+                options.unshift('-i');
+            }
+            await this.git.rebase(options);
+        } catch (error) {
+            console.error('Rebase失败:', error);
+            throw error;
+        }
+    }
+
+    public async abortRebase(): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            await this.git.rebase(['--abort']);
+        } catch (error) {
+            console.error('中止rebase失败:', error);
+            throw error;
+        }
+    }
+
+    public async continueRebase(): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            await this.git.rebase(['--continue']);
+        } catch (error) {
+            console.error('继续rebase失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 强制重置到远程分支
+     */
+    public async resetToRemote(branchName: string): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            // 先fetch最新的远程数据
+            await this.git.fetch();
+            // 强制重置到远程分支
+            await this.git.reset(['--hard', `origin/${branchName}`]);
+        } catch (error) {
+            console.error('重置到远程分支失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Cherry-pick 功能
+     */
+    public async cherryPick(commitHash: string): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            await this.git.raw(['cherry-pick', commitHash]);
+        } catch (error) {
+            console.error('Cherry-pick失败:', error);
+            throw error;
+        }
+    }
+
+    public async cherryPickMultiple(commitHashes: string[]): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            for (const hash of commitHashes) {
+                await this.git.raw(['cherry-pick', hash]);
+            }
+        } catch (error) {
+            console.error('批量cherry-pick失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 分支创建功能
+     */
+    public async createBranch(branchName: string, baseBranch: string, checkout: boolean = true): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            // 先切换到基础分支并拉取最新代码
+            await this.git.checkout(baseBranch);
+            await this.git.pull('origin', baseBranch);
+            
+            // 创建新分支
+            if (checkout) {
+                await this.git.checkoutLocalBranch(branchName);
+            } else {
+                await this.git.branch([branchName]);
+            }
+        } catch (error) {
+            console.error('创建分支失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 分支删除功能
+     */
+    public async deleteLocalBranch(branchName: string, force: boolean = false): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            const options = force ? ['-D', branchName] : ['-d', branchName];
+            await this.git.branch(options);
+        } catch (error) {
+            console.error('删除本地分支失败:', error);
+            throw error;
+        }
+    }
+
+    public async deleteRemoteBranch(branchName: string): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            await this.git.push('origin', branchName, ['--delete']);
+        } catch (error) {
+            console.error('删除远程分支失败:', error);
+            throw error;
+        }
+    }
+
+    public async deleteBranches(branches: Array<{name: string, deleteRemote: boolean, force: boolean}>): Promise<void> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            for (const branch of branches) {
+                // 删除本地分支
+                await this.deleteLocalBranch(branch.name, branch.force);
+                
+                // 如果需要，删除远程分支
+                if (branch.deleteRemote) {
+                    try {
+                        await this.deleteRemoteBranch(branch.name);
+                    } catch (error) {
+                        console.warn(`删除远程分支 ${branch.name} 失败:`, error);
+                        // 继续处理其他分支，不中断整个流程
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('批量删除分支失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 获取工作区状态
+     */
+    public async getWorkingDirectoryStatus(): Promise<{
+        hasChanges: boolean,
+        staged: string[],
+        unstaged: string[],
+        untracked: string[]
+    }> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            const status = await this.git.status();
+            return {
+                hasChanges: !status.isClean(),
+                staged: status.staged,
+                unstaged: status.modified.concat(status.deleted),
+                untracked: status.not_added
+            };
+        } catch (error) {
+            console.error('获取工作区状态失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 检查分支是否存在
+     */
+    public async branchExists(branchName: string, remote: boolean = false): Promise<boolean> {
+        if (!this.git) {
+            throw new Error('Git not initialized');
+        }
+
+        try {
+            const branches = await this.getBranches();
+            const targetType = remote ? 'remote' : 'local';
+            return branches.some(branch => branch.name === branchName && branch.type === targetType);
+        } catch (error) {
+            console.error('检查分支是否存在失败:', error);
+            return false;
         }
     }
 }
