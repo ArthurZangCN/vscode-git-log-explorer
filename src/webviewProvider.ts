@@ -273,35 +273,55 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
         console.log(`🔄 开始比较分支: ${from} vs ${to}`);
         
         try {
-            // 使用GitService的getBranchDifference方法，这是原来的比较逻辑
-            const difference = await this.gitService.getBranchDifference(from, to);
+            // 获取两个分支的完整提交列表
+            const fromCommits = await this.gitService.getCommits(from, 200);
+            const toCommits = await this.gitService.getCommits(to, 200);
             
             // 应用作者筛选
+            let filteredFromCommits = fromCommits;
+            let filteredToCommits = toCommits;
+            
             if (authorFilter) {
-                difference.onlyInFrom = difference.onlyInFrom.filter(commit => 
+                filteredFromCommits = fromCommits.filter(commit => 
                     commit.author.toLowerCase().includes(authorFilter.toLowerCase())
                 );
-                difference.onlyInTo = difference.onlyInTo.filter(commit => 
+                filteredToCommits = toCommits.filter(commit => 
                     commit.author.toLowerCase().includes(authorFilter.toLowerCase())
-                );
-                difference.different = difference.different.filter(diff => 
-                    diff.author.toLowerCase().includes(authorFilter.toLowerCase())
                 );
             }
             
-            // 生成原来格式的比较内容
-            const resultContent = this.generateOriginalComparisonContent(from, to, difference, hideIdentical, authorFilter);
+            // 如果选择隐藏相同提交，则过滤掉commit message完全相同的提交
+            if (hideIdentical) {
+                const fromMessages = new Set(filteredFromCommits.map(c => c.message));
+                const toMessages = new Set(filteredToCommits.map(c => c.message));
+                
+                filteredFromCommits = filteredFromCommits.filter(commit => 
+                    !toMessages.has(commit.message)
+                );
+                filteredToCommits = filteredToCommits.filter(commit => 
+                    !fromMessages.has(commit.message)
+                );
+            }
             
-            // 在新的编辑器窗口中显示比较结果，使用左右并排显示
-            const document = await vscode.workspace.openTextDocument({
-                content: resultContent,
-                language: 'git-commit' // 使用git-commit语法高亮
-            });
+            // 生成美化的HTML格式比较内容
+            const htmlContent = this.generateComparisonHTML(from, to, {
+                fromCommits: filteredFromCommits,
+                toCommits: filteredToCommits
+            }, hideIdentical, authorFilter);
             
-            await vscode.window.showTextDocument(document, {
-                preview: false,
-                viewColumn: vscode.ViewColumn.Beside // 左右并排显示
-            });
+            // 创建webview panel来渲染HTML内容
+            const panel = vscode.window.createWebviewPanel(
+                'gitBranchComparison',
+                `Git 分支比较: ${from} ↔ ${to}`,
+                vscode.ViewColumn.Active,
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true
+                }
+            );
+            
+            // 设置HTML内容到webview
+            panel.webview.html = htmlContent;
             
             vscode.window.showInformationMessage(`✅ 分支比较完成: ${from} ↔ ${to}`);
             
@@ -311,70 +331,359 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private generateOriginalComparisonContent(fromBranch: string, toBranch: string, difference: any, hideIdentical: boolean, authorFilter: string = ''): string {
-        const lines: string[] = [];
-        
-        let title = `Git 分支比较: ${fromBranch} ↔ ${toBranch}`;
-        if (authorFilter) {
-            title += ` - 作者筛选: ${authorFilter}`;
+    private generateComparisonHTML(fromBranch: string, toBranch: string, data: any, hideIdentical: boolean, authorFilter: string = ''): string {
+        const title = authorFilter ? 
+            `Git 分支比较: ${fromBranch} ↔ ${toBranch} - 作者筛选: ${authorFilter}` :
+            `Git 分支比较: ${fromBranch} ↔ ${toBranch}`;
+            
+        return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
         }
         
-        lines.push(title);
-        lines.push('='.repeat(60));
-        lines.push('');
+        .comparison-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
         
-        // 统计信息
-        lines.push(`📊 比较统计:`);
-        lines.push(`   • 仅在 ${fromBranch} 中: ${difference.onlyInFrom.length} 个提交`);
-        lines.push(`   • 仅在 ${toBranch} 中: ${difference.onlyInTo.length} 个提交`);
-        lines.push(`   • 提交说明不同: ${difference.different.length} 个提交`);
-        lines.push('');
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
         
-        // 仅在源分支中的提交
-        if (difference.onlyInFrom.length > 0) {
-            lines.push(`🔴 仅在 ${fromBranch} 中的提交:`);
-            lines.push('-'.repeat(40));
-            for (const commit of difference.onlyInFrom) {
-                lines.push(`${commit.hash} - ${commit.author.replace(/<.*>/, '').trim()}`);
-                lines.push(`    ${commit.message}`);
-                lines.push('');
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .stats-bar {
+            background: #f1f3f4;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e1e4e8;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+        
+        .stat-number {
+            background: #6f42c1;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .comparison-content {
+            display: flex;
+            min-height: 400px;
+        }
+        
+        .branch-column {
+            flex: 1;
+            border-right: 1px solid #e1e4e8;
+        }
+        
+        .branch-column:last-child {
+            border-right: none;
+        }
+        
+        .branch-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e1e4e8;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .branch-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .branch-tag {
+            background: #0366d6;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .commits-list {
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .commit-card {
+            background: #f8f9fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.2s ease;
+        }
+        
+        .commit-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        
+        .commit-hash {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            background: #f6f8fa;
+            color: #0366d6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .commit-message {
+            font-weight: 500;
+            margin: 8px 0;
+            color: #24292e;
+        }
+        
+        .commit-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #586069;
+        }
+        
+        .commit-author {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .author-avatar {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #6f42c1;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        
+        .commit-date {
+            color: #586069;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #586069;
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        @media (max-width: 768px) {
+            .comparison-content {
+                flex-direction: column;
+            }
+            
+            .branch-column {
+                border-right: none;
+                border-bottom: 1px solid #e1e4e8;
+            }
+            
+            .branch-column:last-child {
+                border-bottom: none;
+            }
+            
+            .stats-bar {
+                flex-direction: column;
+                align-items: center;
             }
         }
+    </style>
+</head>
+<body>
+    <div class="comparison-container">
+        <div class="header">
+            <h1>🔀 ${title}</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">生成时间: ${new Date().toLocaleString('zh-CN')}</p>
+            ${hideIdentical ? '<p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 14px;">🔍 已隐藏相同提交</p>' : ''}
+        </div>
         
-        // 仅在目标分支中的提交
-        if (difference.onlyInTo.length > 0) {
-            lines.push(`🟢 仅在 ${toBranch} 中的提交:`);
-            lines.push('-'.repeat(40));
-            for (const commit of difference.onlyInTo) {
-                lines.push(`${commit.hash} - ${commit.author.replace(/<.*>/, '').trim()}`);
-                lines.push(`    ${commit.message}`);
-                lines.push('');
-            }
+        <div class="stats-bar">
+            <div class="stat-item">
+                📊 <span class="stat-number">${data.fromCommits.length}</span> ${fromBranch} 提交数
+            </div>
+            <div class="stat-item">
+                📈 <span class="stat-number">${data.toCommits.length}</span> ${toBranch} 提交数  
+            </div>
+            ${authorFilter ? `<div class="stat-item">👤 作者筛选: ${this.escapeHtml(authorFilter)}</div>` : ''}
+        </div>
+        
+        ${this.generateComparisonBody(fromBranch, toBranch, data, hideIdentical)}
+    </div>
+</body>
+</html>`;
+    }
+
+    private generateComparisonBody(fromBranch: string, toBranch: string, data: any, hideIdentical: boolean): string {
+        // 检查是否有提交
+        const hasAnyCommits = data.fromCommits.length > 0 || data.toCommits.length > 0;
+        
+        if (!hasAnyCommits) {
+            return `
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <h3>没有找到提交记录</h3>
+                    <p>请检查分支名称或筛选条件</p>
+                </div>
+            `;
         }
         
-        // 提交说明不同的记录
-        if (difference.different.length > 0) {
-            lines.push(`🔄 提交说明不同的记录:`);
-            lines.push('-'.repeat(40));
-            for (const diff of difference.different) {
-                lines.push(`${diff.hash} - ${diff.author.replace(/<.*>/, '').trim()}`);
-                lines.push(`    ${fromBranch}: ${diff.fromMessage}`);
-                lines.push(`    ${toBranch}: ${diff.toMessage}`);
-                lines.push('');
-            }
+        let html = '<div class="comparison-content">';
+        
+        // 左侧分支列
+        html += `
+            <div class="branch-column">
+                <div class="branch-header">
+                    <h3 class="branch-title">
+                        <span class="branch-tag">${fromBranch}</span>
+                        提交列表 (${data.fromCommits.length})
+                    </h3>
+                </div>
+                <div class="commits-list">
+                    ${this.renderCommitCards(data.fromCommits, '🔵')}
+                </div>
+            </div>
+        `;
+        
+        // 右侧分支列
+        html += `
+            <div class="branch-column">
+                <div class="branch-header">
+                    <h3 class="branch-title">
+                        <span class="branch-tag">${toBranch}</span>
+                        提交列表 (${data.toCommits.length})
+                    </h3>
+                </div>
+                <div class="commits-list">
+                    ${this.renderCommitCards(data.toCommits, '🟢')}
+                </div>
+            </div>
+        `;
+        
+        html += '</div>';
+        
+        return html;
+    }
+
+    private renderCommitCards(commits: any[], icon: string): string {
+        if (commits.length === 0) {
+            return `
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <p>没有提交记录</p>
+                </div>
+            `;
         }
         
-        // 如果没有差异
-        if (difference.onlyInFrom.length === 0 && 
-            difference.onlyInTo.length === 0 && 
-            difference.different.length === 0) {
-            lines.push('✅ 两个分支没有差异');
-        }
-        
-        lines.push('');
-        lines.push(`生成时间: ${new Date().toLocaleString('zh-CN')}`);
-        
-        return lines.join('\n');
+        return commits.map(commit => {
+            const authorName = commit.author.replace(/<.*>/, '').trim();
+            const fullHash = commit.hash; // 显示完整hash
+            const date = new Date(commit.date).toLocaleDateString('zh-CN');
+            const authorInitials = authorName.split(' ').map((n: string) => n[0] || '').join('').substring(0, 2).toUpperCase();
+            
+            return `
+                <div class="commit-card">
+                    <div class="commit-hash">${icon} ${fullHash}</div>
+                    <div class="commit-message">${this.escapeHtml(commit.message)}</div>
+                    <div class="commit-meta">
+                        <div class="commit-author">
+                            <div class="author-avatar">${authorInitials}</div>
+                            ${this.escapeHtml(authorName)}
+                        </div>
+                        <div class="commit-date">${date}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    private renderDifferentCommits(differentCommits: any[], fromBranch: string, toBranch: string): string {
+        return differentCommits.map(diff => {
+            const authorName = diff.author.replace(/<.*>/, '').trim();
+            const fullHash = diff.hash; // 显示完整hash
+            const authorInitials = authorName.split(' ').map((n: string) => n[0] || '').join('').substring(0, 2).toUpperCase();
+            
+            return `
+                <div class="diff-commit">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div class="commit-hash">🔄 ${fullHash}</div>
+                        <div class="commit-author">
+                            <div class="author-avatar">${authorInitials}</div>
+                            ${this.escapeHtml(authorName)}
+                        </div>
+                    </div>
+                    <div class="diff-messages">
+                        <div class="diff-message diff-from">
+                            <strong>${fromBranch}:</strong> ${this.escapeHtml(diff.fromMessage)}
+                        </div>
+                        <div class="diff-message diff-to">
+                            <strong>${toBranch}:</strong> ${this.escapeHtml(diff.toMessage)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    private escapeHtml(text: string): string {
+        if (!text) return '';
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     private async exitCompareMode() {
@@ -1659,9 +1968,12 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
 
         function escapeHtml(text) {
             if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
         function isLocalBranch() {
