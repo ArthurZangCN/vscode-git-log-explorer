@@ -127,6 +127,15 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
                 case 'requestUserInput':
                     await this.handleUserInputRequest(data.inputType, data.prompt, data.callback);
                     break;
+                case 'toggleCommitDetails':
+                    await this.toggleCommitDetails(data.hash);
+                    break;
+                case 'loadCommitFiles':
+                    await this.loadCommitFiles(data.hash);
+                    break;
+                case 'performMerge':
+                    await this.performMerge();
+                    break;
             }
         });
 
@@ -1161,53 +1170,228 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
         .commits-container {
             max-height: calc(100vh - 300px);
             overflow-y: auto;
+            background: var(--vscode-panel-background);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--vscode-panel-border);
         }
 
         .commit-item {
             border: 1px solid var(--vscode-panel-border);
-            border-radius: 3px;
-            margin-bottom: 6px;
-            padding: 8px;
-            background: var(--vscode-editor-background);
-            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background: var(--vscode-input-background);
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
         }
 
         .commit-item:hover {
             border-color: var(--vscode-focusBorder);
+            background: var(--vscode-list-hoverBackground);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
         }
 
         .commit-item.selected {
             background: var(--vscode-list-activeSelectionBackground);
+            border-color: var(--vscode-list-activeSelectionBackground);
         }
 
         .commit-header {
+            padding: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .commit-first-line {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 8px;
             margin-bottom: 4px;
+        }
+
+        .commit-second-line {
+            padding-left: 24px;
+        }
+
+        .commit-checkbox {
+            margin: 0;
+            cursor: pointer;
+            flex-shrink: 0;
         }
 
         .commit-hash {
             font-family: monospace;
             background: var(--vscode-textBlockQuote-background);
-            padding: 1px 4px;
-            border-radius: 2px;
-            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            color: var(--vscode-textLink-foreground);
+            flex-shrink: 0;
+            min-width: 70px;
         }
 
         .commit-author {
             color: var(--vscode-descriptionForeground);
             font-size: 11px;
+            flex-shrink: 0;
+            min-width: 80px;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .commit-date {
             color: var(--vscode-descriptionForeground);
             font-size: 10px;
+            flex-shrink: 0;
+            min-width: 80px;
         }
 
         .commit-message {
             font-size: 12px;
-            line-height: 1.3;
+            line-height: 1.4;
+            color: var(--vscode-foreground);
+            word-wrap: break-word;
+            white-space: normal;
+        }
+
+        .commit-details {
+            display: none;
+            border-top: 1px solid var(--vscode-panel-border);
+            padding: 12px;
+            background: var(--vscode-textBlockQuote-background);
+            animation: slideDown 0.2s ease;
+        }
+
+        .commit-details.expanded {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                max-height: 500px;
+            }
+        }
+
+        .commit-details-header {
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+
+        .commit-details-row {
+            display: flex;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+
+        .commit-details-label {
+            font-weight: bold;
+            min-width: 60px;
+            color: var(--vscode-foreground);
+        }
+
+        .commit-details-value {
+            color: var(--vscode-descriptionForeground);
+            font-family: monospace;
+        }
+
+        .commit-files {
+            margin-top: 8px;
+        }
+
+        .commit-files-title {
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 2px 0;
+            font-size: 11px;
+            font-family: monospace;
+            cursor: pointer;
+        }
+
+        .file-item:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+
+        .file-status {
+            width: 24px;
+            text-align: center;
+            margin-right: 8px;
+            font-weight: bold;
+            font-size: 10px;
+            padding: 1px 3px;
+            border-radius: 2px;
+            color: white;
+        }
+
+        .file-status.added {
+            background: var(--vscode-gitDecoration-addedResourceForeground);
+        }
+
+        .file-status.modified {
+            background: var(--vscode-gitDecoration-modifiedResourceForeground);
+        }
+
+        .file-status.deleted {
+            background: var(--vscode-gitDecoration-deletedResourceForeground);
+        }
+
+        .file-status.renamed {
+            background: var(--vscode-gitDecoration-renamedResourceForeground, #1f6feb);
+        }
+
+        .file-status.copied {
+            background: var(--vscode-gitDecoration-untrackedResourceForeground, #8b949e);
+        }
+
+        .file-path {
+            flex: 1;
+        }
+
+        .merge-actions {
+            display: none;
+            padding: 8px;
+            background: var(--vscode-panel-background);
+            border-top: 1px solid var(--vscode-panel-border);
+            border-bottom: 1px solid var(--vscode-panel-border);
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .merge-actions.visible {
+            display: block;
+        }
+
+        .merge-info {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 6px;
+        }
+
+        .btn-merge {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: 1px solid var(--vscode-button-border);
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-merge:hover {
+            background: var(--vscode-button-hoverBackground);
         }
 
         .loading, .empty-state {
@@ -1217,6 +1401,12 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             min-height: 100px;
             color: var(--vscode-descriptionForeground);
             font-size: 12px;
+        }
+
+        .loading-files {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
         }
 
         /* 模态框样式 */
@@ -1648,21 +1838,52 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
                 }
             }
 
-            return currentData.commits.map((commit, index) => {
+            // 显示合并操作按钮
+            const selectedCount = currentData.selectedCommits ? currentData.selectedCommits.length : 0;
+            let mergeActionsHtml = '';
+            if (selectedCount >= 2) {
+                mergeActionsHtml = '<div class="merge-actions visible">' +
+                    '<div class="merge-info">已选择 ' + selectedCount + ' 个提交</div>' +
+                    '<button class="btn-merge" data-action="performMerge">合并选中的提交</button>' +
+                    '</div>';
+            }
+
+            const commitsHtml = currentData.commits.map((commit, index) => {
                 const shortHash = commit.hash.substring(0, 8);
                 const authorName = commit.author.replace(/<.*>/, '').trim();
+                const authorEmail = commit.author.match(/<(.+)>/);
+                const fullAuthor = authorEmail ? authorName + ' <' + authorEmail[1] + '>' : authorName;
                 const date = new Date(commit.date).toLocaleDateString('zh-CN');
+                const fullDate = new Date(commit.date).toLocaleString('zh-CN');
                 const isSelected = currentData.selectedCommits && currentData.selectedCommits.includes(commit.hash);
 
                 return '<div class="commit-item ' + (isSelected ? 'selected' : '') + '" data-hash="' + escapeHtml(commit.hash) + '">' +
-                    '<div class="commit-header">' +
+                    '<div class="commit-header" data-action="toggleCommitDetails">' +
+                    '<div class="commit-first-line">' +
+                    '<span class="commit-checkbox"><input type="checkbox" ' + (isSelected ? 'checked' : '') + ' data-action="toggleCommitSelection"></span>' +
                     '<span class="commit-hash">' + escapeHtml(shortHash) + '</span>' +
                     '<span class="commit-author">' + escapeHtml(authorName) + '</span>' +
                     '<span class="commit-date">' + escapeHtml(date) + '</span>' +
                     '</div>' +
-                    '<div class="commit-message">' + escapeHtml(commit.message) + '</div>' +
+                    '<div class="commit-second-line">' +
+                    '<span class="commit-message">' + escapeHtml(commit.message) + '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="commit-details" data-hash="' + escapeHtml(commit.hash) + '">' +
+                    '<div class="commit-details-header">提交详情</div>' +
+                    '<div class="commit-details-row"><span class="commit-details-label">提交者:</span><span class="commit-details-value">' + escapeHtml(fullAuthor) + '</span></div>' +
+                    '<div class="commit-details-row"><span class="commit-details-label">提交时间:</span><span class="commit-details-value">' + escapeHtml(fullDate) + '</span></div>' +
+                    '<div class="commit-details-row"><span class="commit-details-label">提交哈希:</span><span class="commit-details-value">' + escapeHtml(commit.hash) + '</span></div>' +
+                    '<div class="commit-details-row"><span class="commit-details-label">提交信息:</span><span class="commit-details-value">' + escapeHtml(commit.message) + '</span></div>' +
+                    '<div class="commit-files">' +
+                    '<div class="commit-files-title">文件变更: <span class="loading-files">正在加载...</span></div>' +
+                    '<div class="commit-file-list"></div>' +
+                    '</div>' +
+                    '</div>' +
                     '</div>';
             }).join('');
+
+            return mergeActionsHtml + commitsHtml;
         }
 
         function renderBranchOptions(searchQuery = '') {
@@ -1790,10 +2011,26 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
                 });
             }
 
-            // 提交项点击
-            document.querySelectorAll('.commit-item').forEach(item => {
-                item.addEventListener('click', function() {
-                    const hash = this.getAttribute('data-hash');
+            // 提交项事件处理
+            document.querySelectorAll('.commit-header').forEach(header => {
+                header.addEventListener('click', function(event) {
+                    // 阻止复选框点击事件冒泡
+                    if (event.target.type === 'checkbox') {
+                        return;
+                    }
+                    
+                    const hash = this.closest('.commit-item').getAttribute('data-hash');
+                    if (hash) {
+                        toggleCommitDetails(hash);
+                    }
+                });
+            });
+
+            // 复选框点击事件
+            document.querySelectorAll('.commit-checkbox input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('click', function(event) {
+                    event.stopPropagation();
+                    const hash = this.closest('.commit-item').getAttribute('data-hash');
                     if (hash) {
                         toggleCommitSelection(hash);
                     }
@@ -1966,6 +2203,9 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
                 case 'toggleBaseBranchDropdown':
                     toggleBaseBranchDropdown();
                     break;
+                case 'performMerge':
+                    performMerge();
+                    break;
             }
         }
 
@@ -2120,6 +2360,12 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
                         populateModalData(message.modalId, message.data);
                     }
                     break;
+                case 'toggleCommitDetails':
+                    // 这个消息只是用来通知前端，实际逻辑在前端处理
+                    break;
+                case 'commitFiles':
+                    renderCommitFiles(message.hash, message.files);
+                    break;
             }
         });
 
@@ -2156,6 +2402,105 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
 
         function toggleCommitSelection(hash) {
             vscode.postMessage({ type: 'selectCommit', hash: hash });
+        }
+
+        function toggleCommitDetails(hash) {
+            const commitItem = document.querySelector('.commit-item[data-hash="' + hash + '"]');
+            const detailsDiv = commitItem.querySelector('.commit-details');
+            
+            // 关闭其他已展开的详情
+            document.querySelectorAll('.commit-details.expanded').forEach(details => {
+                if (details !== detailsDiv) {
+                    details.classList.remove('expanded');
+                }
+            });
+            
+            // 切换当前详情的展开状态
+            if (detailsDiv.classList.contains('expanded')) {
+                detailsDiv.classList.remove('expanded');
+            } else {
+                detailsDiv.classList.add('expanded');
+                // 加载文件列表
+                loadCommitFiles(hash);
+            }
+        }
+
+        function loadCommitFiles(hash) {
+            vscode.postMessage({ type: 'loadCommitFiles', hash: hash });
+        }
+
+        function performMerge() {
+            vscode.postMessage({ type: 'performMerge' });
+        }
+
+        function renderCommitFiles(hash, files) {
+            const commitItem = document.querySelector('.commit-item[data-hash="' + hash + '"]');
+            if (!commitItem) return;
+            
+            const fileListContainer = commitItem.querySelector('.commit-file-list');
+            const loadingSpan = commitItem.querySelector('.loading-files');
+            
+            if (loadingSpan) {
+                loadingSpan.style.display = 'none';
+            }
+            
+            if (!files || files.length === 0) {
+                fileListContainer.innerHTML = '<div class="file-item">无文件变更</div>';
+                return;
+            }
+            
+            const filesHtml = files.map(file => {
+                let statusClass = '';
+                let statusSymbol = '';
+                
+                switch (file.status) {
+                    case 'A':
+                        statusClass = 'added';
+                        statusSymbol = '增';
+                        break;
+                    case 'M':
+                        statusClass = 'modified';
+                        statusSymbol = '改';
+                        break;
+                    case 'D':
+                        statusClass = 'deleted';
+                        statusSymbol = '删';
+                        break;
+                    case 'R':
+                        statusClass = 'renamed';
+                        statusSymbol = '移';
+                        break;
+                    case 'C':
+                        statusClass = 'copied';
+                        statusSymbol = '复';
+                        break;
+                    default:
+                        statusClass = 'modified';
+                        statusSymbol = '改';
+                }
+                
+                return '<div class="file-item" data-file-path="' + escapeHtml(file.path) + '" data-commit-hash="' + escapeHtml(hash) + '">' +
+                    '<span class="file-status ' + statusClass + '">' + statusSymbol + '</span>' +
+                    '<span class="file-path">' + escapeHtml(file.path) + '</span>' +
+                    '</div>';
+            }).join('');
+            
+            fileListContainer.innerHTML = filesHtml;
+            
+            // 为文件项添加点击事件
+            fileListContainer.querySelectorAll('.file-item').forEach(fileItem => {
+                fileItem.addEventListener('click', function() {
+                    const filePath = this.getAttribute('data-file-path');
+                    const commitHash = this.getAttribute('data-commit-hash');
+                    if (filePath && commitHash) {
+                        vscode.postMessage({ 
+                            type: 'showFileDiff', 
+                            hash: commitHash, 
+                            filePath: filePath 
+                        });
+                    }
+                });
+            });
         }
 
         function exitCompareMode() {
@@ -2944,6 +3289,98 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             this.updateWebview();
         } catch (error) {
             vscode.window.showErrorMessage(`Cherry-pick失败: ${error}`);
+        }
+    }
+
+    private async toggleCommitDetails(hash: string) {
+        this.sendMessage({
+            type: 'toggleCommitDetails',
+            hash: hash
+        });
+    }
+
+    private async loadCommitFiles(hash: string) {
+        try {
+            const files = await this.gitService.getCommitFiles(hash);
+            const filesWithStatus = await this.getCommitFilesWithStatus(hash, files);
+            
+            this.sendMessage({
+                type: 'commitFiles',
+                hash: hash,
+                files: filesWithStatus
+            });
+        } catch (error) {
+            this.sendMessage({
+                type: 'error',
+                message: `加载提交文件失败: ${error}`
+            });
+        }
+    }
+
+    private async performMerge() {
+        const selectedHashes = Array.from(this.selectedCommits);
+        if (selectedHashes.length < 2) {
+            this.sendMessage({
+                type: 'error',
+                message: '请选择至少2个提交进行合并'
+            });
+            return;
+        }
+
+        try {
+            // 按时间顺序排序提交（最旧的在前）
+            const commitsWithTime = selectedHashes.map(hash => {
+                const commit = this.commits.find(c => c.hash === hash);
+                return { hash, date: commit ? new Date(commit.date) : new Date() };
+            }).sort((a, b) => a.date.getTime() - b.date.getTime());
+
+            const sortedHashes = commitsWithTime.map(c => c.hash);
+            
+            const action = await vscode.window.showQuickPick([
+                { label: '🔗 压缩合并 (squash)', value: 'squash', description: '将多个提交合并为一个' },
+                { label: '✏️ 编辑提交消息', value: 'reword', description: '修改提交消息' },
+                { label: '🔄 重新排序', value: 'reorder', description: '调整提交顺序' },
+                { label: '🗑️ 删除提交', value: 'drop', description: '删除选中的提交' }
+            ], { 
+                placeHolder: `选择要对 ${selectedHashes.length} 个提交执行的操作`,
+                ignoreFocusOut: true
+            });
+
+            if (action) {
+                // 模拟git rebase -i操作
+                const commitCount = sortedHashes.length;
+                const baseCommit = sortedHashes[0];
+                
+                if (action.value === 'squash') {
+                    const newMessage = await vscode.window.showInputBox({
+                        prompt: '输入合并后的提交消息',
+                        value: `合并 ${commitCount} 个提交`,
+                        ignoreFocusOut: true
+                    });
+                    
+                    if (newMessage) {
+                        vscode.window.showInformationMessage(
+                            `模拟执行: git rebase -i HEAD~${commitCount} (squash)\n` +
+                            `将合并提交: ${sortedHashes.map(h => h.substring(0, 8)).join(', ')}\n` +
+                            `新提交消息: ${newMessage}`
+                        );
+                    }
+                } else {
+                    vscode.window.showInformationMessage(
+                        `模拟执行: git rebase -i HEAD~${commitCount} (${action.value})\n` +
+                        `操作提交: ${sortedHashes.map(h => h.substring(0, 8)).join(', ')}`
+                    );
+                }
+                
+                // 清除选择
+                this.selectedCommits.clear();
+                this.updateWebview();
+            }
+        } catch (error) {
+            this.sendMessage({
+                type: 'error',
+                message: `合并操作失败: ${error}`
+            });
         }
     }
 
