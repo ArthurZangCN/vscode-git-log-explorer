@@ -1,0 +1,182 @@
+<!-- 比较分支模态框 -->
+    <div id="compareModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">⚖️ 比较分支</span>
+                <span class="close" data-modal="compareModal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">起始分支/标签:</label>
+                <div class="branch-selector">
+                    <input type="text" id="compareFrom" class="form-control" placeholder="搜索或选择起始分支...">
+                    <span class="branch-dropdown-icon" data-action="toggleCompareFromDropdown">▼</span>
+                    <div id="compareFromDropdown" class="branch-dropdown">
+                        <div class="loading">正在加载...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">结束分支/标签:</label>
+                <div class="branch-selector">
+                    <input type="text" id="compareTo" class="form-control" placeholder="搜索或选择结束分支...">
+                    <span class="branch-dropdown-icon" data-action="toggleCompareToDropdown">▼</span>
+                    <div id="compareToDropdown" class="branch-dropdown">
+                        <div class="loading">正在加载...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="hideIdentical">
+                <label for="hideIdentical">隐藏相同提交</label>
+            </div>
+            <div class="form-group">
+                <label class="form-label">作者筛选 (可选):</label>
+                <input type="text" id="compareAuthorFilter" class="form-control" placeholder="输入作者名称...">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" data-modal="compareModal" data-action="close">取消</button>
+                <button class="btn" data-action="performCompare">开始比较</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stash管理模态框 -->
+    <div id="stashModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">📦 Stash管理</span>
+                <span class="close" data-modal="stashModal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">创建新Stash:</label>
+                <input type="text" id="stashMessage" class="form-control" placeholder="输入stash消息...">
+                <div style="margin-top: 6px;">
+                    <button class="btn" data-action="createStash">💾 创建Stash</button>
+                    <button class="btn btn-secondary" data-action="refreshStashList">🔄 刷新</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Stash列表:</label>
+                <div id="stashList" class="list-container">
+                    <div class="loading">正在加载...</div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" data-modal="stashModal" data-action="close">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rebase模态框 -->
+    <div id="rebaseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">🔄 Rebase分支</span>
+                <span class="close" data-modal="rebaseModal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">选择Rebase到的分支:</label>
+                <div class="branch-selector">
+                    <input type="text" id="rebaseTarget" class="form-control" placeholder="搜索或选择目标分支...">
+                    <span class="branch-dropdown-icon" data-action="toggleRebaseDropdown">▼</span>
+                    <div id="rebaseDropdown" class="branch-dropdown">
+                        <div class="loading">正在加载...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="interactiveRebase">
+                <label for="interactiveRebase">交互式Rebase</label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" data-modal="rebaseModal" data-action="close">取消</button>
+                <button class="btn" data-action="performRebase">开始Rebase</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cherry-pick模态框 -->
+    <div id="cherryPickModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">🍒 Cherry-pick提交</span>
+                <span class="close" data-modal="cherryPickModal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">选择源分支:</label>
+                <div class="branch-selector">
+                    <input type="text" id="cherryPickSource" class="form-control" placeholder="搜索或选择源分支...">
+                    <span class="branch-dropdown-icon" data-action="toggleCherryPickDropdown">▼</span>
+                    <div id="cherryPickDropdown" class="branch-dropdown">
+                        <div class="loading">正在加载...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">选择要Cherry-pick的提交:</label>
+                <div id="cherryPickCommits" class="list-container">
+                    <div class="empty-state">请先选择源分支</div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" data-modal="cherryPickModal" data-action="close">取消</button>
+                <button class="btn" data-action="performCherryPick">Cherry-pick</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建分支模态框 -->
+    <div id="createBranchModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">➕ 创建新分支</span>
+                <span class="close" data-modal="createBranchModal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">新分支名称:</label>
+                <input type="text" id="newBranchName" class="form-control" placeholder="输入新分支名称...">
+            </div>
+            <div class="form-group">
+                <label class="form-label">基于分支:</label>
+                <div class="branch-selector">
+                    <input type="text" id="baseBranch" class="form-control" placeholder="搜索或选择基础分支...">
+                    <span class="branch-dropdown-icon" data-action="toggleBaseBranchDropdown">▼</span>
+                    <div id="baseBranchDropdown" class="branch-dropdown">
+                        <div class="loading">正在加载...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="switchToBranch" checked>
+                <label for="switchToBranch">创建后切换到新分支</label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" data-modal="createBranchModal" data-action="close">取消</button>
+                <button class="btn" data-action="performCreateBranch">创建分支</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除分支模态框 -->
+    <div id="deleteBranchModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">🗑️ 删除分支</span>
+                <span class="close" data-modal="deleteBranchModal">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">选择要删除的分支 (可多选):</label>
+                <div id="deleteBranchList" class="list-container">
+                    <div class="loading">正在加载...</div>
+                </div>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="deleteRemoteAlso">
+                <label for="deleteRemoteAlso">同时删除远程分支</label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" data-modal="deleteBranchModal" data-action="close">取消</button>
+                <button class="btn btn-danger" data-action="performDeleteBranches">删除分支</button>
+            </div>
+        </div>
+    </div>

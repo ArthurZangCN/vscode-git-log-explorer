@@ -232,13 +232,19 @@
 <body>
     <div class="comparison-container">
         <div class="header">
-            <h1>{{TITLE}}</h1>
+            <h1>🔀 {{TITLE}}</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">生成时间: {{TIMESTAMP}}</p>
+            {{HIDE_IDENTICAL_MESSAGE}}
         </div>
         
         <div class="stats-bar">
-            {{STATS_CONTENT}}
-            {{HIDE_IDENTICAL_MESSAGE}}
-            {{AUTHOR_FILTER_DISPLAY}}
+            <div class="stat-item">
+                📊 <span class="stat-number">{{FROM_COUNT}}</span> {{FROM_BRANCH}} 提交数
+            </div>
+            <div class="stat-item">
+                📈 <span class="stat-number">{{TO_COUNT}}</span> {{TO_BRANCH}} 提交数  
+            </div>
+            {{AUTHOR_FILTER}}
         </div>
         
         {{COMPARISON_BODY}}

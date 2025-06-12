@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{CSP_SOURCE}} 'nonce-{{NONCE}}'; script-src 'nonce-{{NONCE}}';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Git Log Explorer</title>
-    <style nonce="{{NONCE}}">
-        {{CSS_STYLES}}
+    <style nonce="${nonce}">
+        CSS_CONTENT_PLACEHOLDER
     </style>
 </head>
 <body>
@@ -14,10 +14,10 @@
         <div class="loading">正在加载Git数据...</div>
     </div>
 
-    {{MODAL_HTML}}
+    MODAL_CONTENT_PLACEHOLDER
 
-    <script nonce="{{NONCE}}">
-        {{JAVASCRIPT_CODE}}
+    <script nonce="${nonce}">
+        JS_CONTENT_PLACEHOLDER
     </script>
 </body>
-</html> 
+</html>
