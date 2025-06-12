@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .comparison-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .stats-bar {
+            background: #f1f3f4;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e1e4e8;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+        
+        .stat-number {
+            background: #6f42c1;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .comparison-content {
+            display: flex;
+            min-height: 400px;
+        }
+        
+        .branch-column {
+            flex: 1;
+            border-right: 1px solid #e1e4e8;
+        }
+        
+        .branch-column:last-child {
+            border-right: none;
+        }
+        
+        .branch-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e1e4e8;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .branch-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .branch-tag {
+            background: #0366d6;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .commits-list {
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .commit-card {
+            background: #f8f9fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.2s ease;
+        }
+        
+        .commit-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        
+        .commit-hash {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            background: #f6f8fa;
+            color: #0366d6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .commit-message {
+            font-weight: 500;
+            margin: 8px 0;
+            color: #24292e;
+        }
+        
+        .commit-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #586069;
+        }
+        
+        .commit-author {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .author-avatar {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #6f42c1;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        
+        .commit-date {
+            color: #586069;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #586069;
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        @media (max-width: 768px) {
+            .comparison-content {
+                flex-direction: column;
+            }
+            
+            .branch-column {
+                border-right: none;
+                border-bottom: 1px solid #e1e4e8;
+            }
+            
+            .branch-column:last-child {
+                border-bottom: none;
+            }
+            
+            .stats-bar {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+        
+        .diff-commit {
+            background: #fff5b4;
+            border: 1px solid #e1cc4f;
+        }
+        
+        .diff-messages {
+            margin-top: 10px;
+        }
+        
+        .diff-message {
+            padding: 5px 8px;
+            margin: 2px 0;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .diff-from {
+            background: #ffeaa7;
+            border-left: 3px solid #fdcb6e;
+        }
+        
+        .diff-to {
+            background: #dff0d8;
+            border-left: 3px solid #5cb85c;
+        }
+    </style>
+</head>
+<body>
+    <div class="comparison-container">
+        <div class="header">
+            <h1>{{TITLE}}</h1>
+        </div>
+        
+        <div class="stats-bar">
+            {{STATS_CONTENT}}
+            {{HIDE_IDENTICAL_MESSAGE}}
+            {{AUTHOR_FILTER_DISPLAY}}
+        </div>
+        
+        {{COMPARISON_BODY}}
+    </div>
+</body>
+</html> 

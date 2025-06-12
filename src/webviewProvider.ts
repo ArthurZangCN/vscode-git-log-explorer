@@ -648,34 +648,6 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
         }).join('');
     }
 
-    private renderDifferentCommits(differentCommits: any[], fromBranch: string, toBranch: string): string {
-        return differentCommits.map(diff => {
-            const authorName = diff.author.replace(/<.*>/, '').trim();
-            const fullHash = diff.hash; // 显示完整hash
-            const authorInitials = authorName.split(' ').map((n: string) => n[0] || '').join('').substring(0, 2).toUpperCase();
-            
-            return `
-                <div class="diff-commit">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <div class="commit-hash">🔄 ${fullHash}</div>
-                        <div class="commit-author">
-                            <div class="author-avatar">${authorInitials}</div>
-                            ${this.escapeHtml(authorName)}
-                        </div>
-                    </div>
-                    <div class="diff-messages">
-                        <div class="diff-message diff-from">
-                            <strong>${fromBranch}:</strong> ${this.escapeHtml(diff.fromMessage)}
-                        </div>
-                        <div class="diff-message diff-to">
-                            <strong>${toBranch}:</strong> ${this.escapeHtml(diff.toMessage)}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
     private escapeHtml(text: string): string {
         if (!text) return '';
         return text
@@ -705,10 +677,13 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
             const files = await this.gitService.getCommitFiles(hash);
             const commit = this.commits.find(c => c.hash === hash);
             if (commit) {
+                // 获取文件状态信息
+                const filesWithStatus = await this.getCommitFilesWithStatus(hash, files);
+                
                 this.sendMessage({
                     type: 'commitDetails',
                     commit: commit,
-                    files: files
+                    files: filesWithStatus
                 });
             }
         } catch (error) {
@@ -716,6 +691,34 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
                 type: 'error',
                 message: `获取提交详情失败: ${error}`
             });
+        }
+    }
+
+    private async getCommitFilesWithStatus(hash: string, files: string[]): Promise<any[]> {
+        try {
+            // 使用git show --name-status 获取文件状态
+            if (!this.gitService) {
+                return files.map(file => ({ path: file, status: 'M' }));
+            }
+            
+            // 直接调用git命令获取文件状态
+            const result = await (this.gitService as any).git?.show(['--name-status', '--pretty=format:', hash]);
+            if (!result) {
+                return files.map(file => ({ path: file, status: 'M' }));
+            }
+            
+            const statusLines = result.split('\n').filter((line: string) => line.trim() !== '');
+            const filesWithStatus = statusLines.map((line: string) => {
+                const parts = line.split('\t');
+                const status = parts[0] || 'M';
+                const path = parts[1] || line;
+                return { path, status };
+            });
+            
+            return filesWithStatus;
+        } catch (error) {
+            console.error('获取文件状态失败:', error);
+            return files.map(file => ({ path: file, status: 'M' }));
         }
     }
 
@@ -1968,12 +1971,9 @@ export class GitLogWebviewProvider implements vscode.WebviewViewProvider {
 
         function escapeHtml(text) {
             if (!text) return '';
-            return text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function isLocalBranch() {

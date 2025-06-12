@@ -1,0 +1,18 @@
+<!-- 差异提交模板 -->
+<div class="diff-commit">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div class="commit-hash">🔄 {{FULL_HASH}}</div>
+        <div class="commit-author">
+            <div class="author-avatar">{{AUTHOR_INITIALS}}</div>
+            {{AUTHOR_NAME}}
+        </div>
+    </div>
+    <div class="diff-messages">
+        <div class="diff-message diff-from">
+            <strong>{{FROM_BRANCH}}:</strong> {{FROM_MESSAGE}}
+        </div>
+        <div class="diff-message diff-to">
+            <strong>{{TO_BRANCH}}:</strong> {{TO_MESSAGE}}
+        </div>
+    </div>
+</div> 
